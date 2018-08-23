@@ -27,6 +27,9 @@ import { renderLoop, RenderLoopItem } from './utils/renderloop';
 renderLoop.start();
 export { renderLoop, RenderLoopItem };
 
+// KeyboardManager needs a single instance of itself
+export { keyboardManager } from './utils/keyboard';
+
 // LongPress needs a single instance of itself
 export { longPress } from './behaviors/longpress/longpress';
 

@@ -1,5 +1,6 @@
 import * as debug from '../../utils/debug';
 import { Environment as env } from '../../utils/environment';
+import { keyboardManager } from '../../utils/keyboard';
 import { utils } from '../../utils/utils';
 import { stringUtils } from '../../utils/string';
 import { DOM } from '../../utils/dom';
@@ -1736,7 +1737,7 @@ PopupMenu.prototype = {
    * @returns {void}
    */
   handleCloseEvent() {
-    if (this.holdingDownClick) {
+    if (this.holdingDownClick || keyboardManager.isPressed('Control')) {
       return;
     }
 
