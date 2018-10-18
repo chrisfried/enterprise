@@ -58,11 +58,15 @@ const commandLineArgs = require('yargs')
 
 const chalk = require('chalk');
 const { spawn } = require('child_process');
-const del = require('del');
 const fs = require('fs');
 const path = require('path');
 
+const clean = require('./build/clean');
+const createDirs = require('./build/create-dirs');
 const logger = require('./logger');
+const writeFile = require('./build/write-file');
+const sass = require('./build/sass');
+const sassSettings = require('./configs/sass').sass;
 
 const SRC_DIR = path.join(__dirname, '..', 'src');
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
@@ -127,6 +131,12 @@ const filePaths = {
   }
 
 };
+
+// Target globs to clean
+const cleanTargets = [
+  `${TEMP_DIR}/*.js`,
+  `${TEMP_DIR}/*.scss`
+];
 
 // These search terms are used when scanning existing index files to determine
 // a component's placement in a generated file.
@@ -245,6 +255,22 @@ function capitalize(str) {
 }
 
 /**
+ * Wraps `clean()` to specifically clean the temp folder with a success message.
+ * @returns {Promise} resolved when the clean process completes.
+ */
+function cleanTempDir() {
+  return clean(cleanTargets).catch((e) => {
+    if (commandLineArgs.verbose) {
+      logger('error', `Error Cleaning directory "${TEMP_DIR}": ${e}`);
+    }
+  }).then(() => {
+    if (commandLineArgs.verbose) {
+      logger('success', `Cleaned directory "${TEMP_DIR}"`);
+    }
+  });
+}
+
+/**
  * Converts a library file's name to a matching string that will be
  * used to target an imported/exported library constructor.  This happens by replacing
  * filenames that use dashes followed by lowercase letters, to uppercase letters.
@@ -354,45 +380,6 @@ function writeJSImportStatement(libFile, libPath, isExport, noConstructor) {
 function writeSassImportStatement(libFile, libPath) {
   libFile = sanitizeLibFile(libFile, libPath);
   return `@import '${RELATIVE_SRC_DIR}/${libPath}${libFile}';`;
-}
-
-/**
- * @param {array} dirs an array of strings representing directories
- * @returns {void}
- */
-function createDirs(dirs) {
-  dirs.forEach((dir) => {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir);
-      if (commandLineArgs.verbose) {
-        logger('info', `Created directory "${dir}"`);
-      }
-    }
-  });
-}
-
-/**
- * "cleans" all the folders used by this script
- * @param {boolean} buildTempDir if true, re-builds the `temp/` directory
- * @returns {Promise} that resolves when the `del` library completes its task
- */
-function cleanAll(buildTempDir) {
-  const filesToDel = [
-    `${TEMP_DIR}/*.js`,
-    `${TEMP_DIR}/*.scss`
-  ];
-
-  return del(filesToDel)
-    .catch(err => logger('error', `Error: ${err}`))
-    .then(() => {
-      if (commandLineArgs.verbose) {
-        logger('success', `Cleaned directory "${TEMP_DIR}"`);
-      }
-      if (!buildTempDir) {
-        return;
-      }
-      createDirs([TEMP_DIR]);
-    });
 }
 
 /**
@@ -599,40 +586,6 @@ function renderImportsToString(key, type) {
   });
 
   return fileContents;
-}
-
-/**
- * @private
- * @param {string} targetFilePath the path of the file that will be written
- * @param {string} targetFile the contents of the file to be written
- * @returns {void}
- */
-function logFileResults(targetFilePath, targetFile) {
-  if (!commandLineArgs.verbose) {
-    return;
-  }
-  const kbLength = (Buffer.byteLength(targetFile, 'utf8') / 1024).toFixed(2);
-  logger('success', `File "${chalk.yellow(targetFilePath)}\n" generated (${kbLength} KB)`);
-}
-
-/**
- * Wraps `fs.writeFile()` with actual async
- * @private
- * @param {string} targetFilePath the path of the file that will be written
- * @param {string} targetFile the contents of the file to be written
- * @returns {Promise} results of `fs.writeFile()`
- */
-function writeFile(targetFilePath, targetFile) {
-  return new Promise((resolve, reject) => {
-    fs.writeFile(targetFilePath, targetFile, (err) => {
-      if (err) {
-        logger('error', `${err}`);
-        reject(err);
-      }
-      logFileResults(targetFilePath, targetFile);
-      resolve();
-    });
-  });
 }
 
 /**
@@ -883,6 +836,9 @@ function runBuildProcess(terminalCommand, terminalArgs) {
       if (code !== 0) {
         reject(new Error(`"${terminalCommand}" process exited with error code (${code})\nArgs: ${terminalArgs.join(' ')}`));
       }
+      if (!commandLineArgs.verbose) {
+        logger('info', `${chalk.cyan(terminalCommand)} process completed!`);
+      }
       resolve(log);
     });
   });
@@ -929,8 +885,12 @@ function runBuildProcesses(requested) {
   // Build CSS
   if (commandLineArgs.disableCss) {
     logger('alert', 'Ignoring build process for CSS');
-  } else if (!isCustom || sassMatches.length) {
-    buildPromises.push(runBuildProcess('grunt', sassArgs));
+  } else {
+    let filesList = sassSettings.dist.files;
+    if (isCustom && sassMatches.length) {
+      filesList = sassSettings.custom.files;
+    }
+    buildPromises.push(sass(filesList));
   }
 
   return Promise.all(buildPromises);
@@ -949,7 +909,7 @@ function buildSuccess(logs) {
     logger(null, `${logs[2]}`);
   }
 
-  return cleanAll().then(() => {
+  return cleanTempDir().then(() => {
     logger('success', `IDS Build was successfully created in "${chalk.yellow('dist/')}"`);
     process.exit(0);
   });
@@ -986,7 +946,10 @@ if (!commandLineArgs.components) {
   requestedComponents = commandLineArgs.components.split(',');
 }
 
-cleanAll(true).then(() => {
+cleanTempDir().then(() => {
+  // Build the temp directory
+  createDirs([TEMP_DIR]);
+
   if (!normalBuild) {
     // Display a list of requested components to the console
     let loggedComponentList = `${(commandLineArgs.verbose ? '\n' : '')}${chalk.bold('Searching files in `src/` for the following terms:')}\n`;
