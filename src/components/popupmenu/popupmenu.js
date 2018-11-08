@@ -1057,7 +1057,9 @@ PopupMenu.prototype = {
           // Go back to Top on the last one
           if (focus.parent().prevAll(excludes).length === 0) {
             if (focus.length === 0) {
-              self.highlight(self.menu.children(excludes).last().find('a'));
+              if (!self.menu.children(excludes).last().hasClass('is-placeholder')) {
+                self.highlight(self.menu.children(excludes).last().find('a'));
+              }
             } else {
               self.highlight(getLast(focus));
             }
@@ -1095,7 +1097,9 @@ PopupMenu.prototype = {
           // Go back to Top on the last one
           if (focus.parent().nextAll(excludes).length === 0) {
             if (focus.length === 0) {
-              self.highlight(self.menu.children(excludes).first().find('a'));
+              if (!self.menu.children(excludes).first().hasClass('is-placeholder')) {
+                self.highlight(self.menu.children(excludes).first().find('a'));
+              }
             } else {
               self.highlight(getFirst(focus));
             }
