@@ -33,9 +33,9 @@
           height: 15px;
           position: absolute;
           right: 17px;
-          top: 2px;
-          padding-right: 6px;
           padding-left: 6px;
+          padding-right: 6px;
+          top: 2px;
         }
       }
     }
@@ -43,7 +43,7 @@
     .wrapper {
       .dismissible {
         .icon.close {
-          padding: 0px !important;
+          padding: !important;
           right: 6px !important;
         }
       }
