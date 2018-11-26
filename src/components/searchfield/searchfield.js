@@ -854,7 +854,7 @@ SearchField.prototype = {
       // Visual indicator class
       self.wrapper.addClass('popup-is-open');
 
-      list.on(`click.${this.id}`, 'a', (thisE) => {
+      list.off('click').on(`click.${this.id}`, 'a', (thisE) => {
         const a = $(thisE.currentTarget);
         let ret = a.text().trim();
         const isMoreLink = a.hasClass('more-results');
